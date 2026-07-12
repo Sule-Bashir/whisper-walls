@@ -1,161 +1,420 @@
-import { Scene } from 'phaser';
-import * as Phaser from 'phaser';
-import { IncrementResponse, DecrementResponse, InitResponse } from '../../shared/api';
+import { Scene } from "phaser";
 
 export class Game extends Scene {
-  camera: Phaser.Cameras.Scene2D.Camera;
-  background: Phaser.GameObjects.Image;
-  msg_text: Phaser.GameObjects.Text;
-  count: number = 0;
-  countText: Phaser.GameObjects.Text;
-  incButton: Phaser.GameObjects.Text;
-  decButton: Phaser.GameObjects.Text;
-  goButton: Phaser.GameObjects.Text;
+  private whisperText!: Phaser.GameObjects.Text;
+  private result!: Phaser.GameObjects.Text;
+  private scoreText!: Phaser.GameObjects.Text;
+  private roundText!: Phaser.GameObjects.Text;
+  private progressBar!: Phaser.GameObjects.Graphics;
+  private communityText!: Phaser.GameObjects.Text;
+  private streakText!: Phaser.GameObjects.Text;
+  private buttons: Phaser.GameObjects.Text[] = [];
+  private achievementText!: Phaser.GameObjects.Text;
+  private challengeText!: Phaser.GameObjects.Text;
+  private correctSound!: Phaser.Sound.BaseSound;
+  private gameOverSound!: Phaser.Sound.BaseSound;
+  private achievementSound!: Phaser.Sound.BaseSound;
+  private score = 0;
+  private round = 1;
+  private readonly maxRounds = 10;
+  private answered = false;
 
   constructor() {
-    super('Game');
+    super("Game");
   }
 
   create() {
-    // Configure camera & background
-    this.camera = this.cameras.main;
-    this.camera.setBackgroundColor(0x222222);
+    this.score = 0;
+    this.round = 1;
+    this.answered = false;
+    this.buttons = [];
+    
+    this.loadPlayer();
 
-    // Optional: semi-transparent background image if one has been loaded elsewhere
-    this.background = this.add.image(512, 384, 'background').setAlpha(0.25);
+    this.cameras.main.setBackgroundColor("#111827");
+    this.correctSound = this.sound.add("correct");
+    this.gameOverSound = this.sound.add("gameover");
+    this.achievementSound = this.sound.add("achievement");
+    const centerX = this.scale.width / 2;
+    const centerY = this.scale.height / 2;
 
-    /* -------------------------------------------
-     *  UI Elements
-     * ------------------------------------------- */
-
-    // Display the current count
-    this.countText = this.add
-      .text(512, 340, `Count: ${this.count}`, {
-        fontFamily: 'Arial Black',
-        fontSize: 56,
-        color: '#ffd700',
-        stroke: '#000000',
-        strokeThickness: 10,
+    // Title
+    this.add
+      .text(centerX, 45, "🧱 Whisper Walls", {
+        fontSize: "32px",
+        color: "#ffffff",
+        fontStyle: "bold",
       })
       .setOrigin(0.5);
 
-    // Fetch the initial counter value from server and update UI
-    void (async () => {
-      try {
-        const response = await fetch('/api/init');
-        if (!response.ok) throw new Error(`API error: ${response.status}`);
+    // Score
+    this.scoreText = this.add
+      .text(120, 90, "⭐ 0", {
+        fontSize: "22px",
+        color: "#facc15",
+      })
+      .setOrigin(0.5);
 
-        const data = (await response.json()) as InitResponse;
-        this.count = data.count;
-        this.updateCountText();
-      } catch (error) {
-        console.error('Failed to fetch initial count:', error);
-      }
-    })();
+    // Round
+    this.roundText = this.add
+      .text(this.scale.width - 120, 90, "Round 1/10", {
+        fontSize: "22px",
+        color: "#60a5fa",
+      })
+      .setOrigin(0.5);
 
-    // Button styling helper
-    const createButton = (y: number, label: string, color: string, onClick: () => void) => {
+    // Progress Bar
+    this.progressBar = this.add.graphics();
+    this.drawProgress();
+
+    // Subtitle
+    this.add
+      .text(centerX, 140, "Anonymous Whisper", {
+        fontSize: "20px",
+        color: "#9ca3af",
+      })
+      .setOrigin(0.5);
+
+    // Community Count
+    this.communityText = this.add
+      .text(centerX, 170, "🌍 Community Whispers: Loading...", {
+        fontSize: "18px",
+        color: "#22c55e",
+      })
+      .setOrigin(0.5);
+
+    this.loadCommunityCount();
+    this.streakText = this.add
+  .text(centerX, 185, "🔥 Daily Streak: Loading...", {
+    fontSize: "18px",
+    color: "#fb923c",
+  })
+  .setOrigin(0.5);
+
+this.loadDailyStreak();
+this.achievementText = this.add
+  .text(centerX, 205, "🏆 Achievement: Loading...", {
+    fontSize: "18px",
+    color: "#60a5fa",
+  })
+  .setOrigin(0.5);
+
+this.loadAchievements();
+    this.challengeText = this.add
+  .text(
+    centerX,
+    245,
+    "🎯 Daily Challenge: Loading...",
+    {
+      fontSize: "18px",
+      color: "#facc15",
+      align: "center",
+    }
+  )
+  .setOrigin(0.5);
+
+this.loadDailyChallenge();
+    // Whisper
+    this.whisperText = this.add
+      .text(centerX, centerY + 20, "", {
+        fontSize: "24px",
+        color: "#ffffff",
+        align: "center",
+        wordWrap: {
+          width: this.scale.width - 80,
+        },
+      })
+      .setOrigin(0.5);
+
+    const reactions = [
+      "😂 Funny",
+      "😢 Sad",
+      "😡 Crazy",
+      "❤️ Brave",
+    ];
+
+    reactions.forEach((label, index) => {
       const button = this.add
-        .text(512, y, label, {
-          fontFamily: 'Arial Black',
-          fontSize: 36,
-          color: color,
-          backgroundColor: '#444444',
-          padding: {
-            x: 25,
-            y: 12,
-          } as Phaser.Types.GameObjects.Text.TextPadding,
-        })
+        .text(
+          centerX,                       
+          centerY + 90 + index * 55,
+          label.padEnd(10, " "),
+          {
+            fontSize: "24px",
+            color: "#ffffff",
+            backgroundColor: "#6b7280",
+            padding: {
+              left: 20,
+              right: 20,
+              top: 10,
+              bottom: 10,
+            },
+          }
+        )
         .setOrigin(0.5)
-        .setInteractive({ useHandCursor: true })
-        .on('pointerover', () => button.setStyle({ backgroundColor: '#555555' }))
-        .on('pointerout', () => button.setStyle({ backgroundColor: '#444444' }))
-        .on('pointerdown', onClick);
-      return button;
-    };
+        .setInteractive({ useHandCursor: true });
 
-    // Increment button
-    this.incButton = createButton(this.scale.height * 0.55, 'Increment', '#00ff00', async () => {
-      try {
-        const response = await fetch('/api/increment', { method: 'POST' });
-        if (!response.ok) throw new Error(`API error: ${response.status}`);
+      button.on("pointerdown", () => {
+        this.selectReaction(button, label);
+      });
 
-        const data = (await response.json()) as IncrementResponse;
-        this.count = data.count;
-        this.updateCountText();
-      } catch (error) {
-        console.error('Failed to increment count:', error);
-      }
+      this.buttons.push(button);
     });
+    this.result = this.add
+     .text(centerX, centerY + 285, "👇 Tap one reaction", {
+      fontSize: "22px",
+      color: "#facc15",
+      align: "center",
+      })
+      .setOrigin(0.5);
 
-    // Decrement button
-    this.decButton = createButton(this.scale.height * 0.65, 'Decrement', '#ff5555', async () => {
-      try {
-        const response = await fetch('/api/decrement', { method: 'POST' });
-        if (!response.ok) throw new Error(`API error: ${response.status}`);
-
-        const data = (await response.json()) as DecrementResponse;
-        this.count = data.count;
-        this.updateCountText();
-      } catch (error) {
-        console.error('Failed to decrement count:', error);
-      }
-    });
-
-    // Game Over button – navigates to the GameOver scene
-    this.goButton = createButton(this.scale.height * 0.75, 'Game Over', '#ffffff', () => {
-      this.scene.start('GameOver');
-    });
-
-    // Setup responsive layout
-    this.updateLayout(this.scale.width, this.scale.height);
-    this.scale.on('resize', (gameSize: Phaser.Structs.Size) => {
-      const { width, height } = gameSize;
-      this.updateLayout(width, height);
-    });
-
-    // No automatic navigation to GameOver – users can stay in this scene.
+    this.showRandomWhisper();
   }
 
-  updateLayout(width: number, height: number) {
-    // Resize camera viewport to avoid black bars
-    this.cameras.resize(width, height);
+  private async loadCommunityCount() {
+    try {
+      const res = await fetch("/api/whispers/count");
+      const data = await res.json();
 
-    // Center and scale background image to cover screen
-    if (this.background) {
-      this.background.setPosition(width / 2, height / 2);
-      if (this.background.width && this.background.height) {
-        const scale = Math.max(width / this.background.width, height / this.background.height);
-        this.background.setScale(scale);
-      }
-    }
-
-    // Calculate a scale factor relative to a 1024 × 768 reference resolution.
-    // We only shrink on smaller screens – never enlarge above 1×.
-    const scaleFactor = Math.min(Math.min(width / 1024, height / 768), 1);
-
-    if (this.countText) {
-      this.countText.setPosition(width / 2, height * 0.45);
-      this.countText.setScale(scaleFactor);
-    }
-
-    if (this.incButton) {
-      this.incButton.setPosition(width / 2, height * 0.55);
-      this.incButton.setScale(scaleFactor);
-    }
-
-    if (this.decButton) {
-      this.decButton.setPosition(width / 2, height * 0.65);
-      this.decButton.setScale(scaleFactor);
-    }
-
-    if (this.goButton) {
-      this.goButton.setPosition(width / 2, height * 0.75);
-      this.goButton.setScale(scaleFactor);
+      this.communityText.setText(
+        `🌍 Community Whispers: ${data.count}`
+      );
+    } catch {
+      this.communityText.setText(
+        "🌍 Community Whispers: --"
+      );
     }
   }
+  private async loadPlayer() {
+  // Already have a saved name?
+  const savedName =
+    localStorage.getItem("whisper_username");
 
-  updateCountText() {
-    this.countText.setText(`Count: ${this.count}`);
+  if (savedName) {
+    return;
+  }
+
+  try {
+    const res = await fetch("/api/init");
+    const data = await res.json();
+
+    console.log("INIT RESPONSE:", data);
+
+    if (
+      data.username &&
+      data.username !== "anonymous"
+    ) {
+      localStorage.setItem(
+        "whisper_username",
+        data.username
+      );
+    } else {
+      const fallback =
+        `Player-${Math.floor(Math.random() * 10000)}`;
+
+      localStorage.setItem(
+        "whisper_username",
+        fallback
+      );
+    }
+  } catch (err) {
+    console.error("INIT ERROR:", err);
+
+    const fallback =
+      `Player-${Math.floor(Math.random() * 10000)}`;
+
+    localStorage.setItem(
+      "whisper_username",
+      fallback
+    );
+  }
+}
+  private async loadDailyStreak() {
+  try {
+    const res = await fetch("/api/streak");
+    const data = await res.json();
+
+    this.streakText.setText(
+      `🔥 Daily Streak: ${data.streak} day${data.streak === 1 ? "" : "s"}`
+    );
+  } catch {
+    this.streakText.setText(
+      "🔥 Daily Streak: --"
+    );
+  }
+}
+  private async loadDailyChallenge() {
+  try {
+    const res = await fetch("/api/streak");
+
+    const data = await res.json();
+
+    this.challengeText.setText(
+      `🎯 Daily Challenge: ${data.challenge}`
+    );
+  } catch {
+    this.challengeText.setText(
+      "🎯 Daily Challenge unavailable"
+    );
+  }
+}
+  private async loadAchievements() {
+  try {
+    const res = await fetch("/api/achievements");
+    const data = await res.json();
+
+    this.achievementText.setText(
+      `${data.badge} ${data.title}`
+    );
+  } catch {
+    this.achievementText.setText(
+      "🌱 New Player"
+    );
+  }
+}  
+ 
+  private async saveGameStats() {
+  try {
+    await fetch("/api/stats/game", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        score: this.score,
+      }),
+    });
+  } catch {}
+}
+
+  private async showRandomWhisper() {
+    this.answered = false;
+
+    try {
+      const res = await fetch("/api/whispers/random");
+      const data = await res.json();
+
+      this.whisperText.setAlpha(0);
+      this.whisperText.setText(`"${data.whisper}"`);
+
+      this.tweens.add({
+        targets: this.whisperText,
+        alpha: 1,
+        duration: 300,
+      });
+    } catch {
+      this.whisperText.setText(
+        '"Unable to load whisper."'
+      );
+    }
+
+    this.buttons.forEach((btn) => {
+      btn.setStyle({
+        backgroundColor: "#6b7280",
+      });
+    });
+
+    this.result.setText("👇 Tap one reaction");
+  }
+
+  private selectReaction(
+    button: Phaser.GameObjects.Text,
+    label: string
+  ) {
+    if (this.answered) return;
+
+    this.answered = true;
+
+    this.buttons.forEach((btn) => {
+      btn.setStyle({
+        backgroundColor: "#6b7280",
+      });
+    });
+
+    button.setStyle({
+      backgroundColor: "#16a34a",
+    });
+
+    this.score++;
+
+    this.correctSound.play();
+    this.scoreText.setText(`⭐ ${this.score}`);
+    
+    fetch("/api/stats/reaction", {
+      method: "POST",
+    }).catch(() => {});
+
+    this.result.setText(`✅ You selected: ${label}`);   
+if (this.round >= this.maxRounds) {
+  this.saveGameStats();
+
+  this.loadAchievements();
+
+  if (this.score >= 8) {
+    this.achievementSound.play();
+
+    this.time.delayedCall(1200, () => {
+      this.gameOverSound.play();
+    
+      this.time.delayedCall(500, () => {
+        this.scene.start("GameOver", {
+          score: this.score,
+        });
+      });
+    });
+  } else {
+    this.gameOverSound.play();
+
+    this.time.delayedCall(500, () => {
+      this.scene.start("GameOver", {
+        score: this.score,
+      });
+    });
+  }
+
+  return;
+}
+
+    this.round++;
+
+    this.roundText.setText(
+      `Round ${this.round}/${this.maxRounds}`
+    );
+
+    this.drawProgress();
+
+    this.time.delayedCall(1000, () => {
+      this.showRandomWhisper();
+    });
+  }
+
+  private drawProgress() {
+    const width = 300;
+    const height = 12;
+
+    const x = (this.scale.width - width) / 2;
+    const y = 100;
+
+    this.progressBar.clear();
+
+    this.progressBar.fillStyle(0x374151);
+
+    this.progressBar.fillRoundedRect(
+      x,
+      y,
+      width,
+      height,
+      6
+    );
+
+    this.progressBar.fillStyle(0x22c55e);
+
+    this.progressBar.fillRoundedRect(
+      x,
+      y,
+      (width * this.round) / this.maxRounds,
+      height,
+      6
+    );
   }
 }

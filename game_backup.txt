@@ -1,0 +1,218 @@
+import { Scene } from "phaser";
+import { whispers } from "../data/whispers";
+
+export class Game extends Scene {
+  private whisperText!: Phaser.GameObjects.Text;
+  private result!: Phaser.GameObjects.Text;
+  private scoreText!: Phaser.GameObjects.Text;
+  private roundText!: Phaser.GameObjects.Text;
+  private progressBar!: Phaser.GameObjects.Graphics;
+
+  private buttons: Phaser.GameObjects.Text[] = [];
+
+  private score = 0;
+  private round = 1;
+  private readonly maxRounds = 10;
+  private answered = false;
+
+  constructor() {
+    super("Game");
+  }
+
+  create() {
+    this.cameras.main.setBackgroundColor("#111827");
+
+    const centerX = this.scale.width / 2;
+    const centerY = this.scale.height / 2;
+
+    // Title
+    this.add
+      .text(centerX, 45, "🧱 Whisper Walls", {
+        fontSize: "32px",
+        color: "#ffffff",
+        fontStyle: "bold",
+      })
+      .setOrigin(0.5);
+
+    // Score
+    this.scoreText = this.add
+      .text(120, 90, "⭐ 0", {
+        fontSize: "22px",
+        color: "#facc15",
+      })
+      .setOrigin(0.5);
+
+    // Round
+    this.roundText = this.add
+      .text(this.scale.width - 120, 90, "Round 1/10", {
+        fontSize: "22px",
+        color: "#60a5fa",
+      })
+      .setOrigin(0.5);
+
+    // Progress bar
+    this.progressBar = this.add.graphics();
+    this.drawProgress();
+
+    // Subtitle
+    this.add
+      .text(centerX, 140, "Anonymous Whisper", {
+        fontSize: "20px",
+        color: "#9ca3af",
+      })
+      .setOrigin(0.5);
+
+    // Whisper
+    this.whisperText = this.add
+      .text(centerX, centerY - 20, "", {
+        fontSize: "24px",
+        color: "#ffffff",
+        align: "center",
+        wordWrap: {
+          width: this.scale.width - 80,
+        },
+      })
+      .setOrigin(0.5);
+
+    const reactions = [
+      "😂 Funny",
+      "😢 Sad",
+      "😡 Crazy",
+      "❤️ Brave",
+    ];
+
+    reactions.forEach((label, index) => {
+      const button = this.add
+        .text(
+          centerX,
+          centerY + 60 + index * 55,
+          label,
+          {
+            fontSize: "24px",
+            color: "#ffffff",
+            backgroundColor: "#6b7280",
+            padding: {
+              left: 20,
+              right: 20,
+              top: 10,
+              bottom: 10,
+            },
+          }
+        )
+        .setOrigin(0.5)
+        .setInteractive({ useHandCursor: true });
+
+      button.on("pointerdown", () => {
+        this.selectReaction(button, label);
+      });
+
+      this.buttons.push(button);
+    });
+
+    this.result = this.add
+      .text(centerX, centerY + 300, "👇 Tap one reaction", {
+        fontSize: "22px",
+        color: "#facc15",
+      })
+      .setOrigin(0.5);
+
+    this.showRandomWhisper();
+  }
+  private showRandomWhisper() {
+    this.answered = false;
+
+    const whisper =
+      whispers[Math.floor(Math.random() * whispers.length)];
+
+    this.whisperText.setAlpha(0);
+
+    this.whisperText.setText(`"${whisper}"`);
+
+    this.tweens.add({
+      targets: this.whisperText,
+      alpha: 1,
+      duration: 300,
+    });
+
+    this.buttons.forEach((btn) => {
+      btn.setStyle({
+        backgroundColor: "#6b7280",
+      });
+    });
+
+    this.result.setText("👇 Tap one reaction");
+  }
+
+  private selectReaction(
+    button: Phaser.GameObjects.Text,
+    label: string
+  ) {
+    if (this.answered) return;
+
+    this.answered = true;
+
+    this.buttons.forEach((btn) => {
+      btn.setStyle({
+        backgroundColor: "#6b7280",
+      });
+    });
+
+    button.setStyle({
+      backgroundColor: "#16a34a",
+    });
+
+    this.score++;
+    this.scoreText.setText(`⭐ ${this.score}`);
+
+    this.result.setText(`✅ You selected: ${label}`);
+
+    if (this.round >= this.maxRounds) {
+      this.time.delayedCall(1000, () => {
+        this.scene.start("GameOver", {
+          score: this.score,
+        });
+      });
+      return;
+    }
+
+    this.round++;
+
+    this.roundText.setText(
+      `Round ${this.round}/${this.maxRounds}`
+    );
+
+    this.drawProgress();
+
+    this.time.delayedCall(1000, () => {
+      this.showRandomWhisper();
+    });
+  }
+
+  private drawProgress() {
+    const width = 300;
+    const height = 12;
+
+    const x = (this.scale.width - width) / 2;
+    const y = 100;
+
+    this.progressBar.clear();
+
+    this.progressBar.fillStyle(0x374151);
+    this.progressBar.fillRoundedRect(
+      x,
+      y,
+      width,
+      height,
+      6
+    );
+
+    this.progressBar.fillStyle(0x22c55e);
+    this.progressBar.fillRoundedRect(
+      x,
+      y,
+      (width * this.round) / this.maxRounds,
+      height,
+      6
+    );
+  }
+}

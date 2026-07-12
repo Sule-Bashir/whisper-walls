@@ -1,0 +1,22 @@
+export const whispers = [
+  "I accidentally ghosted my boss for three days.",
+  "I still sleep with a teddy bear.",
+  "I pretended to know coding in my interview.",
+  "I ate someone else's lunch at work.",
+  "I failed my driving test four times.",
+  "I still use '123456' as one password.",
+  "I skipped class just to watch football.",
+  "I laughed during a serious meeting.",
+  "I told my mom I was studying but I was gaming.",
+  "I secretly enjoy pineapple on pizza.",
+  "I once replied 'love you too' to my lecturer.",
+  "I blamed my little brother for something I broke.",
+  "I forgot my own birthday once.",
+  "I danced in my room until someone walked in.",
+  "I spent hours looking for my phone while holding it.",
+  "I told everyone I was sick just to stay home.",
+  "I cried because I lost a game.",
+  "I laughed so hard I snorted in public.",
+  "I still watch cartoons alone.",
+  "I once waved back at someone who wasn't waving at me."
+];

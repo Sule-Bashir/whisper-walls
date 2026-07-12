@@ -1,11 +1,11 @@
-import { Hono } from 'hono';
-import type { UiResponse } from '@devvit/web/shared';
-import { context } from '@devvit/web/server';
-import { createPost } from '../core/post';
+import { Hono } from "hono";
+import type { UiResponse } from "@devvit/web/shared";
+import { context } from "@devvit/web/server";
+import { createPost } from "../core/post";
 
 export const menu = new Hono();
 
-menu.post('/post-create', async (c) => {
+menu.post("/post-create", async (c) => {
   try {
     const post = await createPost();
 
@@ -16,12 +16,34 @@ menu.post('/post-create', async (c) => {
       200
     );
   } catch (error) {
-    console.error(`Error creating post: ${error}`);
     return c.json<UiResponse>(
       {
-        showToast: 'Failed to create post',
+        showToast: `Create post failed: ${String(error)}`,
       },
       400
     );
   }
+});
+
+menu.post("/example-form", async (c) => {
+  return c.json<UiResponse>(
+    {
+      showForm: {
+        name: "exampleForm",
+        form: {
+          title: "Submit a Whisper",
+          fields: [
+            {
+              type: "paragraph",
+              name: "message",
+              label: "Your anonymous whisper",
+              helpText: "Share your confession anonymously.",
+              required: true,
+            },
+          ],
+        },
+      },
+    },
+    200
+  );
 });

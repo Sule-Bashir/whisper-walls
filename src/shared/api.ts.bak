@@ -13,20 +13,6 @@ export type IncrementResponse = {
 
 export type DecrementResponse = {
   type: "decrement";
-  count: number;
   postId: string;
-};
-
-export type Whisper = {
-  text: string;
-  createdAt: number;
-};
-
-export type WhisperResponse = {
-  success: boolean;
-  total?: number;
-};
-
-export type WhisperCountResponse = {
   count: number;
 };

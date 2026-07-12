@@ -1,66 +1,150 @@
-import { Scene } from 'phaser';
-import * as Phaser from 'phaser';
+import { Scene } from "phaser";
 
 export class GameOver extends Scene {
-  camera: Phaser.Cameras.Scene2D.Camera;
-  background: Phaser.GameObjects.Image;
-  gameover_text: Phaser.GameObjects.Text;
-
   constructor() {
-    super('GameOver');
+    super("GameOver");
   }
+   
+  private async submitScore(score: number) {
+  try {
+    const username =
+      localStorage.getItem("whisper_username") ?? "Anonymous";
 
-  create() {
-    // Configure camera
-    this.camera = this.cameras.main;
-    this.camera.setBackgroundColor(0xff0000);
+    await fetch("/api/leaderboard", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        username,
+        score,
+      }),
+    });
+  } catch (err) {
+    console.error(err);
+  }
+}
+  create(data: { score?: number }) {
+    this.cameras.main.setBackgroundColor("#111827");
 
-    // Background – create once, full-screen
-    this.background = this.add.image(0, 0, 'background').setOrigin(0).setAlpha(0.5);
+    const centerX = this.scale.width / 2;
+    const centerY = this.scale.height / 2;
 
-    // "Game Over" text – created once and scaled responsively
-    this.gameover_text = this.add
-      .text(0, 0, 'Game Over', {
-        fontFamily: 'Arial Black',
-        fontSize: '64px',
-        color: '#ffffff',
-        stroke: '#000000',
-        strokeThickness: 8,
-        align: 'center',
+    const score = data.score ?? 0;
+    this.submitScore(score);
+    this.add
+      .text(centerX, centerY - 170, "🧱 Whisper Walls", {
+        fontSize: "34px",
+        color: "#ffffff",
+        fontStyle: "bold",
       })
       .setOrigin(0.5);
 
-    // Initial responsive layout
-    this.updateLayout(this.scale.width, this.scale.height);
+    this.add
+      .text(centerX, centerY - 110, "🎉 Game Over!", {
+        fontSize: "30px",
+        color: "#22c55e",
+      })
+      .setOrigin(0.5);
 
-    // Update layout on canvas resize / orientation change
-    this.scale.on('resize', (gameSize: Phaser.Structs.Size) => {
-      const { width, height } = gameSize;
-      this.updateLayout(width, height);
+    this.add
+      .text(centerX, centerY - 40, `⭐ Final Score: ${score}/10`, {
+        fontSize: "28px",
+        color: "#facc15",
+      })
+      .setOrigin(0.5);
+
+    let message = "Good effort!";
+
+    if (score === 10) {
+      message = "🏆 Perfect! You're a Whisper Master!";
+    } else if (score >= 8) {
+      message = "🔥 Amazing! Come back tomorrow!";
+    } else if (score >= 5) {
+      message = "👏 Nice job! Can you score higher?";
+    }
+    let dailyReward = "";
+
+if (score >= 8) {
+  dailyReward =
+    "🏅 Daily Challenge Completed!\nCome back tomorrow for a new challenge.";
+} else {
+  dailyReward =
+    "🎯 Daily Challenge Failed\nScore 8/10 or higher to earn today's badge.";
+}
+    this.add
+      .text(centerX, centerY + 20, message, {
+        fontSize: "22px",
+        color: "#60a5fa",
+        align: "center",
+      })
+      .setOrigin(0.5);
+    this.add
+  .text(centerX, centerY + 70, dailyReward, {
+    fontSize: "20px",
+    color: "#22c55e",
+    align: "center",
+  })
+  .setOrigin(0.5);
+
+    // Play Again
+    const playAgain = this.add
+      .text(centerX, centerY + 130, "▶ Play Again", {
+        fontSize: "26px",
+        color: "#ffffff",
+        backgroundColor: "#2563eb",
+        padding: {
+          left: 22,
+          right: 22,
+          top: 10,
+          bottom: 10,
+        },
+      })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true });
+
+    playAgain.on("pointerdown", () => {
+      this.scene.start("MainMenu");
     });
 
-    // Return to Main Menu on tap / click
-    this.input.once('pointerdown', () => {
-      this.scene.start('MainMenu');
+    // Submit Whisper
+    const submitButton = this.add
+      .text(centerX, centerY + 190, "✍ Submit a Whisper", {
+        fontSize: "26px",
+        color: "#ffffff",
+        backgroundColor: "#16a34a",
+        padding: {
+          left: 22,
+          right: 22,
+          top: 10,
+          bottom: 10,
+        },
+      })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true });
+
+    submitButton.on("pointerdown", () => {
+      this.scene.start("SubmitWhisper");
     });
-  }
 
-  private updateLayout(width: number, height: number): void {
-    // Resize camera viewport to prevent black bars
-    this.cameras.resize(width, height);
+    // Main Menu
+    const menuButton = this.add
+      .text(centerX, centerY + 250, "🏠 Main Menu", {
+        fontSize: "24px",
+        color: "#ffffff",
+        backgroundColor: "#6b7280",
+        padding: {
+          left: 20,
+          right: 20,
+          top: 10,
+          bottom: 10,
+        },
+      })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true });
 
-    // Stretch background to fill entire screen
-    if (this.background) {
-      this.background.setDisplaySize(width, height);
-    }
-
-    // Compute scale factor (never enlarge above 1×)
-    const scaleFactor = Math.min(Math.min(width / 1024, height / 768), 1);
-
-    // Centre and scale the game-over text
-    if (this.gameover_text) {
-      this.gameover_text.setPosition(width / 2, height / 2);
-      this.gameover_text.setScale(scaleFactor);
-    }
+    menuButton.on("pointerdown", () => {
+      this.scene.start("MainMenu");
+    });
   }
 }

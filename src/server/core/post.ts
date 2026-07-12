@@ -1,7 +1,11 @@
-import { reddit } from '@devvit/web/server';
+import { reddit, context } from "@devvit/web/server";
 
 export const createPost = async () => {
+  console.log("context.subredditName =", context.subredditName);
+
   return await reddit.submitCustomPost({
-    title: '<% name %>',
+    subredditName: context.subredditName,
+    title: "Whisper Walls",
+    entry: "default",
   });
 };

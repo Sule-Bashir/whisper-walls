@@ -1,27 +1,30 @@
-import { Hono } from 'hono';
-import { context, redis, reddit } from '@devvit/web/server';
+import { Hono } from "hono";
+import { context, redis, reddit } from "@devvit/web/server";
 import type {
   DecrementResponse,
   IncrementResponse,
-  InitResponse,
-} from '../../shared/api';
+} from "../../shared/api";
 
 type ErrorResponse = {
-  status: 'error';
+  status: "error";
   message: string;
 };
 
 export const api = new Hono();
 
-api.get('/init', async (c) => {
+// ======================
+// INIT
+// ======================
+api.get("/init", async (c) => {
   const { postId } = context;
 
   if (!postId) {
-    console.error('API Init Error: postId not found in devvit context');
+    console.error("API Init Error: postId not found in context");
+
     return c.json<ErrorResponse>(
       {
-        status: 'error',
-        message: 'postId is required but missing from context',
+        status: "error",
+        message: "postId is required but missing from context",
       },
       400
     );
@@ -29,65 +32,100 @@ api.get('/init', async (c) => {
 
   try {
     const [count, username] = await Promise.all([
-      redis.get('count'),
+      redis.get("count"),
       reddit.getCurrentUsername(),
     ]);
 
-    return c.json<InitResponse>({
-      type: 'init',
-      postId: postId,
+    console.log("===== INIT API =====");
+    console.log("Context:", context);
+    console.log("Username:", username);
+
+    const response = {
+      type: "init",
+      postId,
       count: count ? parseInt(count) : 0,
-      username: username ?? 'anonymous',
-    });
+      username:
+        username ??
+        `Player-${Math.floor(Math.random() * 10000)}`,
+    };
+
+    console.log("INIT RESPONSE:", response);
+
+    return c.json(response);
   } catch (error) {
-    console.error(`API Init Error for post ${postId}:`, error);
-    let errorMessage = 'Unknown error during initialization';
-    if (error instanceof Error) {
-      errorMessage = `Initialization failed: ${error.message}`;
-    }
+    console.error("INIT ERROR:", error);
+
     return c.json<ErrorResponse>(
-      { status: 'error', message: errorMessage },
+      {
+        status: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Unknown error",
+      },
       400
     );
   }
 });
 
-api.post('/increment', async (c) => {
+// ======================
+// INCREMENT
+// ======================
+api.post("/increment", async (c) => {
   const { postId } = context;
+
   if (!postId) {
     return c.json<ErrorResponse>(
       {
-        status: 'error',
-        message: 'postId is required',
+        status: "error",
+        message: "postId is required",
       },
       400
     );
   }
 
-  const count = await redis.incrBy('count', 1);
+  const count = await redis.incrBy("count", 1);
+
   return c.json<IncrementResponse>({
-    count,
+    type: "increment",
     postId,
-    type: 'increment',
+    count,
   });
 });
 
-api.post('/decrement', async (c) => {
+// ======================
+// DECREMENT
+// ======================
+api.post("/decrement", async (c) => {
   const { postId } = context;
+
   if (!postId) {
     return c.json<ErrorResponse>(
       {
-        status: 'error',
-        message: 'postId is required',
+        status: "error",
+        message: "postId is required",
       },
       400
     );
   }
 
-  const count = await redis.incrBy('count', -1);
+  const count = await redis.incrBy("count", -1);
+
   return c.json<DecrementResponse>({
-    count,
+    type: "decrement",
     postId,
-    type: 'decrement',
+    count,
+  });
+});
+
+// ======================
+// TEMP RESET LEADERBOARD
+// ======================
+api.post("/reset-leaderboard", async (c) => {
+  await redis.set("leaderboard", JSON.stringify([]));
+
+  return c.json({
+    success: true,
+    message: "Leaderboard cleared.",
   });
 });
